@@ -34,7 +34,7 @@ except ImportError:
 
 setup(
     name             = 'asis',
-    version          = '0.2',
+    version          = '0.2.1',
     description      = 'Lightweight As-Is Server',
     long_description = '''
         A lightweight utility for serving As-Is document (containing headers
@@ -42,7 +42,7 @@ setup(
     author           = 'Dan Lecocq',
     author_email     = 'dan@seomoz.org',
     scripts          = ['bin/asis-server'],
-    url              = 'http://github.com/seomoz/asis-server',
+    url              = 'http://github.com/seomoz/asis',
     py_modules       = ['asis'],
     platforms        = "Posix; MacOS X",
     classifiers      = [
