@@ -1,0 +1,21 @@
+HTTP/1.1 200 OK
+Content-Length: 0
+Content-Type: text/html; charset=ISO-8859-16
+
+<html>
+	<head>
+		<title>An example of ISO-8859-16 Encoding</title>
+	</head>
+	<body>
+		<p>The Content-Length for this page does not matter, as it specifies a
+			charset. As such, the asis server actually encodes it and computes 
+			an updated length</p>
+		<p>This is a page that should be presented as encoded in iso-8859-16.
+			The list of the encodings we test is roughly based on 
+			<a href='http://en.wikipedia.org/wiki/Character_encoding'>this 
+			Wikipedia page</a>.</p>
+		<p>
+			Here is a sampling of some of its characters: ÒÓÔŐÖŚŰÙÚÛÜĘȚ
+		</p>
+	</body>
+</html>

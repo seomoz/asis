@@ -1,0 +1,12 @@
+HTTP/1.0 200 OK
+Content-Length: 137
+Content-Type: text/html
+
+<html>
+    <head>
+        <title>Basic Test Page</title>
+    </head>
+    <body>
+        <p>Hello, I'm a test page</p>
+    </body>
+</html>

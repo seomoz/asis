@@ -1,0 +1,18 @@
+HTTP/1.1 200 OK
+Content-Length: 0
+Content-Encoding: gzip
+Content-Type: text/html
+
+<html>
+    <head>
+        <title>An example of Gzip-Encoded content</title>
+    </head>
+    <body>
+        <p>The Content-Length for this page does not matter, as it specifies a
+            charset. As such, the asis server actually encodes it and computes 
+            an updated length</p>
+        <p>We should see a link: 
+            <a href='http://wikipedia.org/gzip'>gzip</a>
+        </p>
+    </body>
+</html>

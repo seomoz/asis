@@ -1,0 +1,21 @@
+HTTP/1.1 200 OK
+Content-Length: 0
+Content-Type: text/html; charset=windows-1256
+
+<html>
+	<head>
+		<title>An example of windows-1256 Encoding</title>
+	</head>
+	<body>
+		<p>The Content-Length for this page does not matter, as it specifies a
+			charset. As such, the asis server actually encodes it and computes 
+			an updated length</p>
+		<p>This is a page that should be presented as encoded in windows-1256.
+			The list of the encodings we test is roughly based on 
+			<a href='http://en.wikipedia.org/wiki/Character_encoding'>this 
+			Wikipedia page</a>.</p>
+		<p>
+			Here is a sampling of some of its characters: دان لكوك
+		</p>
+	</body>
+</html>
