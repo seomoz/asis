@@ -32,6 +32,8 @@ parser.add_argument('path', default='.', type=str, nargs='?',
     help='The path of the stored As-Is files')
 parser.add_argument('--port', dest='port', default=80, type=int,
     help='The port to run the server on')
+parser.add_argument('--daemonize', dest='daemonize', action='store_true',
+    help='Daemonize the server')
 parser.add_argument('--server', dest='server', default='wsgiref', type=str,
     help='Which server backend to use (gevent, twisted, etc.)')
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
@@ -43,5 +45,13 @@ if args.verbose:
     import logging
     asis.logger.setLevel(logging.DEBUG)
 
+# Let's be safe and use an absolute path here
 path = os.path.abspath(args.path)
-asis.Server(path, args.port, args.server).run()
+
+# And what mode are we starting this thing up in?
+mode = 'block'
+if args.daemonize:
+    mode = 'fork'
+
+# Now run the damned thing
+asis.Server(path, args.port, args.server, mode).run()

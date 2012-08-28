@@ -72,9 +72,15 @@ class Server(object):
             import zlib
             return zlib.compress(body)[2:-4]
 
-    def __init__(self, path, port=80, server='wsgiref'):
-        self.pid = None
+    def __init__(self, path, port=80, server='gevent', mode='gevent'):
+        '''Mode should be one of:
+            - gevent   (runs in separate green thread)
+            - fork     (forks off sub process)
+            - block    (blocks the process)
+        '''
         self.app = Bottle()
+        self.pid = None
+        self.mode = mode
         self.path = path
         self.port = port
         self.server = server
@@ -148,25 +154,55 @@ class Server(object):
         except IOError:
             abort(404, 'File Not Found')
 
+    def _run(self):
+        '''Actually run the server, whether it's in a separate process, or
+        blocking or in a green thread'''
+        try:
+            run(self.app, host='', port=self.port, server=self.server)
+        except KeyboardInterrupt:
+            # Finished
+            pass
+
     def run(self):
         '''Start running the server'''
         self.app.route('/<path:path>')(self.handle)
-        logger.info('Starting server with %s' % self.server)
-        self.pid = os.fork()
-        if self.pid == 0:
-            # I'm the child process
-            run(self.app, host='', port=self.port, server=self.server)
-            exit(0)
+        if self.mode == 'fork':
+            logger.info('Forking server with %s' % self.server)
+            self.pid = os.fork()
+            if self.pid == 0:
+                # I'm the child process
+                self._run()
+                exit(0)
+            else:
+                import time
+                time.sleep(1)
+                logger.info('Server started in %s' % self.pid)
+        elif self.mode == 'gevent':
+            logger.info('Launching server in greenlet %s' % self.server)
+            from gevent import Greenlet
+            self.pid = Greenlet.spawn(self._run)
+            # We actually need to wait a very short time before saying that
+            # it's started. I believe that all this does is to yield control
+            # from this green thread to the other green thread briefly
+            self.pid.join(0.01)
         else:
-            import time
-            time.sleep(1)
-            logger.info('Server started in %s' % self.pid)
+            # Blocking
+            self._run()
 
     def stop(self):
         '''Stop running the server'''
         logger.info('Shutting down server...')
-        # Send SIGINT
-        os.kill(self.pid, 2)
-        # And then wait for the process to terminate
-        os.waitpid(self.pid, 0)
-        self.pid = 0
+        if self.mode == 'fork':
+            # Send SIGINT
+            os.kill(self.pid, 2)
+            # And then wait for the process to terminate
+            os.waitpid(self.pid, 0)
+            self.pid = None
+        elif self.mode == 'gevent':
+            # Raise the KeyboardInterrupt in the green thread, and wait for it
+            logger.debug('Killing greenlet')
+            import gevent
+            self.pid.kill(gevent.GreenletExit, block=True)
+            self.pid = None
+        else:
+            self.app.close()
