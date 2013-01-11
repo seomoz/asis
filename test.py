@@ -23,12 +23,14 @@
 
 '''Our unit test, y'all'''
 
+from gevent import monkey; monkey.patch_all()
+
 import asis
 import logging
 import unittest
 import requests
 
-asis.logger.setLevel(logging.DEBUG)
+asis.logger.setLevel(logging.WARNING)
 
 
 class AsisTest(unittest.TestCase):
@@ -86,6 +88,11 @@ class AsisTest(unittest.TestCase):
         self.assertNotEqual(req.headers['content-length'], len(req.content))
         self.assertIn('Deflate', req.content)
 
+        # But for unsupported compression schemes, it shouldn't change anything
+        # It should still work, though.
+        req = requests.get(self.base + 'encoding/unsupported.asis')
+        self.assertIn('Unsupported', req.content)
+
     def test_encoding(self):
         '''It should update the encodings provided correctly'''
         for num in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 16]:
@@ -125,6 +132,7 @@ class ContextManagerTest(unittest.TestCase):
         # No longer able to fetch
         self.assertRaises(requests.exceptions.ConnectionError,
             requests.get, url)
+
 
 if __name__ == '__main__':
     unittest.main()

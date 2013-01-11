@@ -42,6 +42,7 @@ logger.setLevel(logging.WARNING)
 class Server(object):
     '''Regular expression for matching found headers'''
     headerMatch = re.compile(r'([^:]+):([^\r]+)$')
+    supported_encodings = ('gzip', 'deflate')
 
     @staticmethod
     def compress(body, content_encoding):
@@ -95,29 +96,40 @@ class Server(object):
         '''Reads the contenst of a file, manipulates the headers and responds
         with the content to send back'''
         # Open the provided file, and read it
+        logger.debug('Opening %s...' % os.path.join(self.path, path))
         with open(os.path.join(self.path, path)) as fin:
+            logger.debug('    Reading...')
             lines = fin.read().split('\n')
             # First, the status line
+            logger.debug('    Reading status line...')
             if lines[0].startswith('HTTP'):
                 response.status = lines[0].partition(' ')[2]
             else:
                 response.status = lines[0]
 
             # Find the empty line, which corresponds to the end of our headers
+            logger.debug('    Finding end of headers...')
             try:
                 index = lines.index('')
-            except AttributeError:
+            except ValueError:
                 index = len(lines)
 
             # Now take those lines and interpret them as headers
+            logger.debug('    Reading headers...')
             del response.headers['Content-Type']
             for line in lines[1:index]:
                 key, sep, value = line.partition(': ')
-                response.headers[key] = value
+                # Headers are supposed to be iso-8859-1
+                response.headers[key] = value.decode(
+                    'utf-8').encode('iso-8859-1')
 
             # If there were only headers, then return empty content
             if index == len(lines):
                 return ''
+
+            # Listen for any directives for Asis
+            directives = [d.strip().lower()
+                for d in str(response.headers.pop('Asis', '')).split(';')]
 
             # Otherwise, content is the remainder of the document
             content = '\n'.join(lines[(index + 1):])
@@ -125,7 +137,7 @@ class Server(object):
             # First, check if there's a character set specified
             charset = response.headers.get(
                 'Content-Type', '').partition('; charset=')[2]
-            if charset:
+            if charset and ('no-charset' not in directives):
                 logger.debug('Encoding to character set: %s' % charset)
                 content = content.decode('utf-8').encode(charset)
                 # Update the Content-Length if one was included
@@ -134,7 +146,8 @@ class Server(object):
 
             # Now, check to see if any content encoding has been specified
             encoding = response.headers.get('Content-Encoding', '')
-            if encoding and encoding in ('gzip', 'deflate'):
+            if encoding and encoding in self.supported_encodings and (
+                'no-encoding' not in directives):
                 logger.debug('Encoding to %s' % encoding)
                 # Encode it, and update Content-Length
                 content = self.compress(content, encoding)
@@ -144,6 +157,8 @@ class Server(object):
             elif encoding:
                 logger.warn('Encoding %s not supported' % encoding)
 
+            logger.debug('    Headers: %s' % dict(response.headers))
+            logger.debug('    Returning content...')
             return content
 
     def handle(self, path):
@@ -153,6 +168,10 @@ class Server(object):
             return self.read(path)
         except IOError:
             abort(404, 'File Not Found')
+        except:
+            logger.exception('Unexpected error')
+            import traceback
+            abort(500, traceback.format_exc())
 
     def _run(self):
         '''Actually run the server, whether it's in a separate process, or

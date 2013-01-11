@@ -1,0 +1,14 @@
+HTTP/1.1 200 OK
+Content-Length: 246
+Content-Encoding: unsupported
+Content-Type: text/html
+
+<html>
+    <head>
+        <title>An example of Unsupported-Encoded content</title>
+    </head>
+    <body>
+        <p>The Content-Length for this page <em>should</em> matter, since this
+            encoding is unsupported.</p>
+    </body>
+</html>
