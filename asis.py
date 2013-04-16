@@ -120,8 +120,7 @@ class Server(object):
             for line in lines[1:index]:
                 key, sep, value = line.partition(': ')
                 # Headers are supposed to be iso-8859-1
-                response.headers[key] = value.decode(
-                    'utf-8').encode('iso-8859-1')
+                response.headers[key] = value
 
             # If there were only headers, then return empty content
             if index == len(lines):
@@ -130,6 +129,12 @@ class Server(object):
             # Listen for any directives for Asis
             directives = [d.strip().lower()
                 for d in str(response.headers.pop('Asis', '')).split(';')]
+
+            # Unless there's a directive to not encode headers, then encode 
+            if 'no-header-encode' not in directives:
+                for key, value in response.headers.items():
+                    response.headers[key] = value.decode(
+                        'utf-8').encode('iso-8859-1')
 
             # Otherwise, content is the remainder of the document
             content = '\n'.join(lines[(index + 1):])

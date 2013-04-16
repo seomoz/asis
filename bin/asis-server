@@ -22,7 +22,6 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import asis
 import argparse
 
 # Read in some of our arguments
@@ -40,6 +39,14 @@ parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
     help='Be extra talkative')
 
 args = parser.parse_args()
+
+# If the server is gevent, we have to monkey patch before we import bottle
+if args.server == 'gevent':
+    from gevent import monkey
+    monkey.patch_all()
+
+# /Now/ we can import asis if we need to
+import asis
 
 if args.verbose:
     import logging

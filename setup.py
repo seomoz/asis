@@ -34,7 +34,7 @@ except ImportError:
 
 setup(
     name             = 'asis',
-    version          = '0.2.1',
+    version          = '0.2.2',
     description      = 'Lightweight As-Is Server',
     long_description = '''
         A lightweight utility for serving As-Is document (containing headers

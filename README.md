@@ -104,6 +104,20 @@ explicitly save your examples in their declared character set. Like changes to
 `Content-Encoding`, the `Content-Length` header is recomputed to be correct
 once the transformation is complete.
 
+Asis Headers
+------------
+Directives provided under the 'Asis' header are stripped out of the document
+before being sent along, and can offer ways of modifying default behavior. The
+directives can be `;`-separated, and currently include:
+
+- `no-header-encode` -- Don't encode change the encoding of headers. They're
+    supposed to be `iso-8859-1`, but sometimes this is part of the beahvior
+    you're trying to test
+- `no-charset` -- Don't encode the output in the provided charset and instead
+    leave it as is
+- `no-encoding` -- Don't encode the output in the provided encoding (`gzip`,
+    `deflate`, etc.) and just leave it as is
+
 Modes
 =====
 By default, the server is started with the `gevent` server, and it's started in
