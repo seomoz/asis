@@ -116,7 +116,7 @@ class Server(object):
 
             # Now take those lines and interpret them as headers
             logger.debug('    Reading headers...')
-            del response.headers['Content-Type']
+            response.headers.pop('Content-Type', None)
             for line in lines[1:index]:
                 key, sep, value = line.partition(': ')
                 # Headers are supposed to be iso-8859-1
