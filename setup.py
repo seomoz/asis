@@ -40,7 +40,7 @@ setup(
         A lightweight utility for serving As-Is document (containing headers
         and content) over HTTP''',
     author           = 'Dan Lecocq',
-    author_email     = 'dan@seomoz.org',
+    author_email     = 'dan@moz.com',
     scripts          = ['bin/asis-server'],
     url              = 'http://github.com/seomoz/asis',
     py_modules       = ['asis'],
