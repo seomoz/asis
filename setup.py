@@ -21,16 +21,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-try:
-    from setuptools import setup
-    extra = {
-        'install_requires': ['bottle', 'gevent']
-    }
-except ImportError:
-    from distutils.core import setup
-    extra = {
-        'dependencies': ['bottle', 'gevent']
-    }
+from setuptools import setup
 
 setup(
     name             = 'asis',
@@ -41,14 +32,19 @@ setup(
         and content) over HTTP''',
     author           = 'Dan Lecocq',
     author_email     = 'dan@moz.com',
-    scripts          = ['bin/asis-server'],
     url              = 'http://github.com/seomoz/asis',
-    py_modules       = ['asis'],
-    platforms        = "Posix; MacOS X",
+    py_modules       = [
+        'asis'
+    ],
+    scripts          = [
+        'bin/asis-server'
+    ],
+    install_requires = [
+        'bottle'
+    ],
     classifiers      = [
         'Development Status :: 3 - Alpha',
         'Environment :: Console',
         'Intended Audience :: Developers',
-        'Topic :: System :: Shells'],
-    **extra
+        'Topic :: System :: Shells']
 )
