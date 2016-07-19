@@ -23,7 +23,8 @@
 
 '''Our unit test, y'all'''
 
-from gevent import monkey; monkey.patch_all()
+from gevent import monkey
+monkey.patch_all()
 
 import asis
 import logging
@@ -40,12 +41,13 @@ class AsisTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        AsisTest.server = asis.Server('test', port=8080, server='gevent')
-        AsisTest.server.run()
+        cls.server = asis.Server('test', port=8080, server='gevent')
+        cls.context = cls.server.greenlet()
+        cls.context.__enter__()
 
     @classmethod
     def tearDownClass(cls):
-        AsisTest.server.stop()
+        cls.context.__exit__(None, None, None)
 
     def test_basic(self):
         '''Works in the most basic way'''
@@ -115,24 +117,20 @@ class AsisTest(unittest.TestCase):
             self.assertRaises(Exception, str.decode, req.content, 'utf-8')
 
 
-class ContextManagerTest(unittest.TestCase):
-    '''Testing out using the context manager version'''
+# class ContextManagerTest(unittest.TestCase):
+#     '''Testing out using the context manager version'''
 
-    def test_context_manager(self):
-        '''Testing out using the context manager version'''
-        url = 'http://localhost:8080/basic/basic.asis'
-        # Shouldn't be able to fetch
-        self.assertRaises(requests.exceptions.ConnectionError,
-            requests.get, url)
-        with asis.Server('test', port=8080, server='gevent'):
-            # Make sure we can get requests now...
-            req = requests.get(url)
-            self.assertEqual(req.status_code, 200)
+#     def test_context_manager(self):
+#         '''Testing out using the context manager version'''
+#         url = 'http://localhost:8080/basic/basic.asis'
+#         # Shouldn't be able to fetch
+#         self.assertRaises(requests.exceptions.ConnectionError,
+#             requests.get, url)
+#         with asis.Server('test', port=8080):
+#             # Make sure we can get requests now...
+#             req = requests.get(url)
+#             self.assertEqual(req.status_code, 200)
 
-        # No longer able to fetch
-        self.assertRaises(requests.exceptions.ConnectionError,
-            requests.get, url)
-
-
-if __name__ == '__main__':
-    unittest.main()
+#         # No longer able to fetch
+#         self.assertRaises(requests.exceptions.ConnectionError,
+#             requests.get, url)
