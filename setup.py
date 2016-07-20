@@ -25,7 +25,7 @@ from setuptools import setup
 
 setup(
     name             = 'asis',
-    version          = '0.2.3',
+    version          = '0.3.0',
     description      = 'Lightweight As-Is Server',
     long_description = '''
         A lightweight utility for serving As-Is document (containing headers
