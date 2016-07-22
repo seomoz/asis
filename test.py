@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+#
 #! /usr/bin/env python
 #
 # Copyright (c) 2012 SEOmoz
@@ -23,9 +25,11 @@
 
 '''Our unit test, y'all'''
 
-from gevent import monkey; monkey.patch_all()
+from gevent import monkey
+monkey.patch_all()
 
 import asis
+import mock
 import logging
 import unittest
 import requests
@@ -40,12 +44,13 @@ class AsisTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        AsisTest.server = asis.Server('test', port=8080, server='gevent')
-        AsisTest.server.run()
+        cls.server = asis.Server('test', port=8080, server='gevent')
+        cls.context = cls.server.greenlet()
+        cls.context.__enter__()
 
     @classmethod
     def tearDownClass(cls):
-        AsisTest.server.stop()
+        cls.context.__exit__(None, None, None)
 
     def test_basic(self):
         '''Works in the most basic way'''
@@ -114,25 +119,55 @@ class AsisTest(unittest.TestCase):
             # Also, none of these should parse when interpreted as UTF-8
             self.assertRaises(Exception, str.decode, req.content, 'utf-8')
 
+    def test_charset_no_length(self):
+        '''When a charset is used, but a content-length is absent, none is provided.'''
+        # Just exercise this branch
+        requests.get(self.base + 'basic/charset-no-length.asis')
 
-class ContextManagerTest(unittest.TestCase):
-    '''Testing out using the context manager version'''
+    def test_encoding_no_length(self):
+        '''When an encoding is used, but a content-length is absent, none is provided.'''
+        # Just exercise this branch
+        requests.get(self.base + 'basic/encoding-no-length.asis')
 
-    def test_context_manager(self):
-        '''Testing out using the context manager version'''
-        url = 'http://localhost:8080/basic/basic.asis'
-        # Shouldn't be able to fetch
-        self.assertRaises(requests.exceptions.ConnectionError,
-            requests.get, url)
-        with asis.Server('test', port=8080, server='gevent'):
-            # Make sure we can get requests now...
-            req = requests.get(url)
+    def test_header_encode(self):
+        '''Encode headers unless directed otherwise.'''
+        req = requests.get(self.base + 'basic/header-encode.asis')
+        # This is the iso-8859-1 encoding for Î
+        self.assertEqual(req.headers['special-key'], '\xce')
+
+    def test_no_header_encode(self):
+        '''Doesn't headers when directed.'''
+        req = requests.get(self.base + 'basic/no-header-encode.asis')
+        # This is the utf-8 encoding for Î
+        self.assertEqual(req.headers['special-key'], '\xc3\x8e')
+
+    def test_check_ready_true(self):
+        '''Returns true if the server is ready.'''
+        self.assertTrue(self.server.check_ready())
+
+    def test_check_ready_false(self):
+        '''Returns false if the server is not ready.'''
+        self.assertFalse(asis.Server('test', port=8081).check_ready())
+
+    def test_raises_spawned_exception(self):
+        '''Reraises spawned greenlet exceptions.'''
+        server = asis.Server('test', port=8081, server='gevent')
+        with mock.patch.object(server, 'run', side_effect=ValueError('kaboom')):
+            with self.assertRaises(ValueError):
+                with server.greenlet():
+                    pass
+
+    def test_fork_basic(self):
+        '''Forking server works.'''
+        server = asis.Server('test', port=8081, server='gevent')
+        with server.fork():
+            req = requests.get('http://localhost:8081/basic/basic.asis')
             self.assertEqual(req.status_code, 200)
 
-        # No longer able to fetch
-        self.assertRaises(requests.exceptions.ConnectionError,
-            requests.get, url)
-
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_fork_early_exit(self):
+        '''Raises an exception if the child process exits early.'''
+        server = asis.Server('test', port=8081, server='gevent')
+        with mock.patch.object(server, 'run', side_effect=ValueError('kaboom')):
+            with self.assertRaises(RuntimeError):
+                with server.fork():
+                    pass

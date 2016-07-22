@@ -23,9 +23,12 @@
 
 '''A server that merely serves as-is documents'''
 
+import contextlib
+import logging
 import os
 import re
-import logging
+import socket
+
 from bottle import Bottle, run, response, abort
 
 
@@ -39,8 +42,10 @@ logger.addHandler(handler)
 logger.setLevel(logging.WARNING)
 
 
-class Server(object):
-    '''Regular expression for matching found headers'''
+class Handler(object):
+    '''Handle requests for asis documents.'''
+
+    # Regular expression for matching found headers
     headerMatch = re.compile(r'([^:]+):([^\r]+)$')
     supported_encodings = ('gzip', 'deflate')
 
@@ -55,7 +60,7 @@ class Server(object):
             fout.write(body)
             fout.close()
             return ios.getvalue()
-        elif content_encoding == 'deflate':
+        elif content_encoding == 'deflate':  # pragma: no branch
             # This is a piece of code I find a little contentious. Apparently,
             # some browsers interpret `deflate` as a full zlib stream (with
             # header and checksum, and others interpret it merely as the
@@ -73,24 +78,8 @@ class Server(object):
             import zlib
             return zlib.compress(body)[2:-4]
 
-    def __init__(self, path, port=80, server='gevent', mode='gevent'):
-        '''Mode should be one of:
-            - gevent   (runs in separate green thread)
-            - fork     (forks off sub process)
-            - block    (blocks the process)
-        '''
-        self.app = Bottle()
-        self.pid = None
-        self.mode = mode
+    def __init__(self, path):
         self.path = path
-        self.port = port
-        self.server = server
-
-    def __enter__(self):
-        self.run()
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.stop()
 
     def read(self, path):
         '''Reads the contenst of a file, manipulates the headers and responds
@@ -178,55 +167,86 @@ class Server(object):
             import traceback
             abort(500, traceback.format_exc())
 
-    def _run(self):
-        '''Actually run the server, whether it's in a separate process, or
-        blocking or in a green thread'''
-        try:
-            run(self.app, host='', port=self.port, server=self.server)
-        except KeyboardInterrupt:
-            # Finished
-            pass
+
+class Server(object):
+    '''Server holding the bottle app and tooling to run it in different modes.'''
+
+    def __init__(self, path, host='0.0.0.0', port=80, server='cherrypy'):
+        self.host = host
+        self.port = port
+        self.server = server
+        self.app = Bottle()
+        self.app.route('/<path:path>')(Handler(path).handle)
 
     def run(self):
         '''Start running the server'''
-        self.app.route('/<path:path>')(self.handle)
-        if self.mode == 'fork':
-            logger.info('Forking server with %s' % self.server)
-            self.pid = os.fork()
-            if self.pid == 0:
-                # I'm the child process
-                self._run()
-                exit(0)
-            else:
-                import time
-                time.sleep(1)
-                logger.info('Server started in %s' % self.pid)
-        elif self.mode == 'gevent':
-            logger.info('Launching server in greenlet %s' % self.server)
-            from gevent import Greenlet
-            self.pid = Greenlet.spawn(self._run)
-            # We actually need to wait a very short time before saying that
-            # it's started. I believe that all this does is to yield control
-            # from this green thread to the other green thread briefly
-            self.pid.join(0.01)
-        else:
-            # Blocking
-            self._run()
+        run(self.app, host=self.host, port=self.port, server=self.server)
 
-    def stop(self):
-        '''Stop running the server'''
-        logger.info('Shutting down server...')
-        if self.mode == 'fork':
-            # Send SIGINT
-            os.kill(self.pid, 2)
-            # And then wait for the process to terminate
-            os.waitpid(self.pid, 0)
-            self.pid = None
-        elif self.mode == 'gevent':
-            # Raise the KeyboardInterrupt in the green thread, and wait for it
-            logger.debug('Killing greenlet')
-            import gevent
-            self.pid.kill(gevent.GreenletExit, block=True)
-            self.pid = None
+    def check_ready(self, timeout=0.01):
+        '''Wait until host is accepting connections on the provided port.'''
+        timeout = 0.01
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        if sock.connect_ex((self.host, self.port)) == 0:
+            return True
+        return False
+
+    @contextlib.contextmanager
+    def fork(self):
+        '''Run an asis server in a separate process.'''
+        logger.info('Forking server with %s', self.server)
+        pid = os.fork()
+        if pid == 0:  # pragma: no cover
+            # I'm the child process
+            try:
+                self.run()
+            finally:
+                os._exit(0)
         else:
-            self.app.close()
+            # Wait for the child process to be ready and responding
+            while True:
+                try:
+                    os.kill(pid, 0)
+                except OSError:
+                    raise RuntimeError('Child process died.')
+                else:
+                    if self.check_ready():
+                        logger.info('Server started in %s', pid)
+                        break
+
+            try:
+                yield
+            finally:
+                # SIGINT and wait for the child to finish
+                os.kill(pid, 2)
+                os.waitpid(pid, 0)
+
+    @contextlib.contextmanager
+    def greenlet(self):
+        '''Run an asis server in a greenlet.'''
+        # Ensure that monkey-patching has happened before running the server.
+        # We avoid aggressively monkey-patching at the top of the file since
+        # this class may be used from many contexts, including potentially
+        # without the advent of `gevent`.
+        from gevent import monkey
+        monkey.patch_all()
+
+        import gevent
+        spawned = gevent.Greenlet.spawn(self.run)
+        try:
+            # Wait until something is listening on the specified port. Two
+            # outcomes are possible -- an exception happens and the greenlet
+            # terminates, or it starts the server and is listening on the
+            # provided port.
+            while spawned:
+                if self.check_ready():
+                    break
+
+            # If the greenlet had an exception, re-raise it in this context
+            if not spawned:
+                raise spawned.exception
+
+            yield spawned
+        finally:
+            spawned.kill(KeyboardInterrupt, block=True)
+            spawned.join()
