@@ -11,5 +11,5 @@ pbr==1.10.0
 pycparser==2.14
 python-termstyle==0.1.10
 rednose==1.1.1
-requests==2.10.0
+requests==2.20.0
 six==1.10.0
