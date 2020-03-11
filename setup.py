@@ -30,7 +30,7 @@ setup(
     long_description = '''
         A lightweight utility for serving As-Is document (containing headers
         and content) over HTTP''',
-    author           = 'Moz Pro Services',
+    author           = 'Moz, Inc.',
     author_email     = 'turbo@moz.com',
     url              = 'http://github.com/seomoz/asis',
     py_modules       = [
