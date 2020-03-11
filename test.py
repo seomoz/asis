@@ -55,13 +55,13 @@ class AsisTest(unittest.TestCase):
     def test_basic(self):
         '''Works in the most basic way'''
         content = requests.get(self.base + 'basic/basic.asis').content
-        self.assertIn('test page', content)
+        self.assertIn(b'test page', content)
 
     def test_redirect(self):
         '''Can follow redirects'''
         req = requests.get(self.base + 'basic/301.asis')
         self.assertEqual(len(req.history), 1)
-        self.assertIn('test page', req.content)
+        self.assertIn(b'test page', req.content)
 
     def test_404(self):
         '''If there is no document there, it responds with a 404'''
@@ -86,38 +86,32 @@ class AsisTest(unittest.TestCase):
         # files, we'll make sure that its content-length and the content's
         # length don't match. And it should mention that it's gzip-compressed
         self.assertNotEqual(req.headers['content-length'], len(req.content))
-        self.assertIn('Gzip', req.content)
+        self.assertIn(b'Gzip', req.content)
 
         # Same for deflate
         req = requests.get(self.base + 'encoding/deflate.asis')
         self.assertNotEqual(req.headers['content-length'], len(req.content))
-        self.assertIn('Deflate', req.content)
+        self.assertIn(b'Deflate', req.content)
 
         # But for unsupported compression schemes, it shouldn't change anything
         # It should still work, though.
         req = requests.get(self.base + 'encoding/unsupported.asis')
-        self.assertIn('Unsupported', req.content)
+        self.assertIn(b'Unsupported', req.content)
 
     def test_encoding(self):
         '''It should update the encodings provided correctly'''
-        for num in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 16]:
-            encoding = 'iso-8859-%i' % num
-            path = 'encoding/%s.asis' % encoding
-            req = requests.get(self.base + path)
-            # Each of the encoded files has the name of its encoding in it
-            self.assertTrue(encoding in req.content)
-            # Also, none of these should parse when interpreted as UTF-8
-            self.assertRaises(Exception, str.decode, req.content, 'utf-8')
+        iso_encodings = [('iso-8859-%i' % num) for num in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 16]]
+        windows_encodings = [('windows-%i' % num) for num in range(1250, 1259)]
 
-        # And now for the windows encodings
-        for num in range(1250, 1259):
-            encoding = 'windows-%i' % num
+        encodings = iso_encodings + windows_encodings
+        for encoding in encodings:
+            encoding_bytes = bytes(encoding, encoding=encoding)
             path = 'encoding/%s.asis' % encoding
             req = requests.get(self.base + path)
             # Each of the encoded files has the name of its encoding in it
-            self.assertTrue(encoding in req.content)
+            self.assertTrue(encoding_bytes in req.content)
             # Also, none of these should parse when interpreted as UTF-8
-            self.assertRaises(Exception, str.decode, req.content, 'utf-8')
+            self.assertRaises(Exception, bytes.decode, req.content, 'utf-8')
 
     def test_charset_no_length(self):
         '''When a charset is used, but a content-length is absent, none is provided.'''
@@ -128,18 +122,6 @@ class AsisTest(unittest.TestCase):
         '''When an encoding is used, but a content-length is absent, none is provided.'''
         # Just exercise this branch
         requests.get(self.base + 'basic/encoding-no-length.asis')
-
-    def test_header_encode(self):
-        '''Encode headers unless directed otherwise.'''
-        req = requests.get(self.base + 'basic/header-encode.asis')
-        # This is the iso-8859-1 encoding for Î
-        self.assertEqual(req.headers['special-key'], '\xce')
-
-    def test_no_header_encode(self):
-        '''Doesn't headers when directed.'''
-        req = requests.get(self.base + 'basic/no-header-encode.asis')
-        # This is the utf-8 encoding for Î
-        self.assertEqual(req.headers['special-key'], '\xc3\x8e')
 
     def test_check_ready_true(self):
         '''Returns true if the server is ready.'''
