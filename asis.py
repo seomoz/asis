@@ -54,7 +54,7 @@ class Handler(object):
         '''Compress the provided content subject to the content encoding'''
         if content_encoding == 'gzip':
             import gzip
-            from cStringIO import StringIO
+            from io import StringIO
             ios = StringIO()
             fout = gzip.GzipFile(fileobj=ios, mode='wb')
             fout.write(body)
@@ -82,74 +82,85 @@ class Handler(object):
         self.path = path
 
     def read(self, path):
-        '''Reads the contenst of a file, manipulates the headers and responds
+        '''Reads the contents of a file, manipulates the headers and responds
         with the content to send back'''
         # Open the provided file, and read it
         logger.debug('Opening %s...' % os.path.join(self.path, path))
-        with open(os.path.join(self.path, path)) as fin:
+
+        # Read file as binary.  Don't make assumptions about content encoding until we can be sure.
+        with open(os.path.join(self.path, path), 'rb') as fin:
             logger.debug('    Reading...')
-            lines = fin.read().split('\n')
+            lines = fin.read().split(b'\n')
+
             # First, the status line
             logger.debug('    Reading status line...')
-            if lines[0].startswith('HTTP'):
-                response.status = lines[0].partition(' ')[2]
+
+            # ASSUMPTION. The HTTP Status line will be ascii.
+            status_line = lines[0].decode('ascii')
+            if status_line.startswith('HTTP'):
+                response.status = status_line.partition(' ')[2]
             else:
-                response.status = lines[0]
+                response.status = status_line
+
+            # According to RFC 7230, only allow ASCII chars in headers.
+            # Anything requiring an advanced charset can do so via an
+            # escapement scheme. The use of which is beyond our use-case.
+            logger.debug('    Reading headers...')
 
             # Find the empty line, which corresponds to the end of our headers
-            logger.debug('    Finding end of headers...')
             try:
-                index = lines.index('')
+                logger.debug('    Finding end of headers...')
+                index = lines.index(b'')
             except ValueError:
                 index = len(lines)
 
-            # Now take those lines and interpret them as headers
-            logger.debug('    Reading headers...')
+            # Ignore any pre-existing content-type header.
             response.headers.pop('Content-Type', None)
+
+            # Now iterate over the lines before we hit the 'empty line' that ends the header section.
             for line in lines[1:index]:
-                key, sep, value = line.partition(': ')
-                # Headers are supposed to be iso-8859-1
+                key, sep, value = line.partition(b': ')
+
+                # According to RFC 7230, only allow ASCII chars in headers.
+                # Anything requiring an advanced charset can do so via an
+                # escapement scheme. The use of which is beyond our use-case.
+                key = key.decode('ascii').lower()
+                value = value.decode('ascii')
+
                 response.headers[key] = value
 
-            # If there were only headers, then return empty content
+            # record any directives specifically intended for asis file processing before sending.
+            directives = [d.strip().lower() for d in response.headers.get('asis', '').split(';')]
+
+            # If all of the lines were headers, return an empty body.
             if index == len(lines):
-                return ''
+                return b''
 
-            # Listen for any directives for Asis
-            directives = [d.strip().lower()
-                for d in str(response.headers.pop('Asis', '')).split(';')]
+            # Otherwise, the content is the rest of the file.
+            content = b'\n'.join(lines[(index + 1):])
 
-            # Unless there's a directive to not encode headers, then encode 
-            if 'no-header-encode' not in directives:
-                for key, value in response.headers.items():
-                    response.headers[key] = value.decode(
-                        'utf-8').encode('iso-8859-1')
-
-            # Otherwise, content is the remainder of the document
-            content = '\n'.join(lines[(index + 1):])
-            # If there are any transformation we have to apply, then apply them
-            # First, check if there's a character set specified
-            charset = response.headers.get(
-                'Content-Type', '').partition('; charset=')[2]
+            charset = response.headers.get('content-type', '').partition('; charset=')[2]
             if charset and ('no-charset' not in directives):
-                logger.debug('Encoding to character set: %s' % charset)
+                # if no-charset is not set, it specifies that the file is encoded in UTF-8 and should
+                # be re-encoded per the charset stated in the content-type header.
                 content = content.decode('utf-8').encode(charset)
-                # Update the Content-Length if one was included
-                if response.headers.get('Content-Length'):
-                    response.headers['Content-Length'] = len(content)
 
-            # Now, check to see if any content encoding has been specified
-            encoding = response.headers.get('Content-Encoding', '')
-            if encoding and encoding in self.supported_encodings and (
-                'no-encoding' not in directives):
-                logger.debug('Encoding to %s' % encoding)
-                # Encode it, and update Content-Length
-                content = self.compress(content, encoding)
-                if response.headers.get('Content-Length'):
-                    logger.debug('New Content-Length %s' % len(content))
-                    response.headers['Content-Length'] = len(content)
-            elif encoding:
-                logger.warn('Encoding %s not supported' % encoding)
+            encoding = response.headers.get('content-encoding', '')
+            if encoding and ('no-encoding' not in directives):
+                # If no-encoding is not set, it specifies that the file needs to be encoded in with
+                # the given encoder before sending.
+
+                if encoding in self.supported_encodings:
+                    logger.debug('Encoding to %s' % encoding)
+                    content = self.compress(content, encoding)
+                else:
+                    logger.warn('Encoding %s not supported' % encoding)
+
+            # Because we may have re-encoded and/or compressed the content, we
+            # should re-calculate the content-length if one had been otherwise
+            # specified.
+            if 'content-length' in response.headers:
+                response.headers['content-length'] = len(content)
 
             logger.debug('    Headers: %s' % dict(response.headers))
             logger.debug('    Returning content...')

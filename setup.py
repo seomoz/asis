@@ -25,13 +25,13 @@ from setuptools import setup
 
 setup(
     name             = 'asis',
-    version          = '0.3.0',
+    version          = '0.3.1',
     description      = 'Lightweight As-Is Server',
     long_description = '''
         A lightweight utility for serving As-Is document (containing headers
         and content) over HTTP''',
-    author           = 'Dan Lecocq',
-    author_email     = 'dan@moz.com',
+    author           = 'Moz, Inc.',
+    author_email     = 'turbo@moz.com',
     url              = 'http://github.com/seomoz/asis',
     py_modules       = [
         'asis'
