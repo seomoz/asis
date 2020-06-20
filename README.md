@@ -9,6 +9,12 @@ It should be mentioned that if you're looking to capture requests from existing
 services and then replay them, the [vcr](https://github.com/myronmarston/vcr)
 project has been ported to several languages and is very useful.
 
+![Status: Production](https://img.shields.io/badge/status-production-green.svg?style=flat)
+![Team: Big Data](https://img.shields.io/badge/team-big_data-green.svg?style=flat)
+![Scope: External](https://img.shields.io/badge/scope-external-green.svg?style=flat)
+![Open Source: MIT](https://img.shields.io/badge/open_source-MIT-green.svg?style=flat)
+![Critical: Yes](https://img.shields.io/badge/critical-yes-red.svg?style=flat)
+
 What Is?
 ========
 Twisted comes with a feature called `as-is` serving, inspired by Apache. But,
